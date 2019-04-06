@@ -1,0 +1,100 @@
+1_page_Я не знаю .txt https://habr.com/ru/post/147927/
+2_page_Особенност.txt https://habr.com/ru/post/249165/
+3_page_Все програ.txt https://habr.com/ru/post/307354/
+4_page_В защиту О.txt https://habr.com/ru/post/418133/
+5_page_ООП мертво.txt https://habr.com/ru/post/441174/
+6_page_Забытая ис.txt https://habr.com/ru/company/ruvds/blog/428582/
+7_page_PHP — ООП .txt https://habr.com/ru/post/23619/
+8_page_Мысли об О.txt https://habr.com/ru/post/111125/
+9_page_ООП будуще.txt https://habr.com/ru/company/jugru/blog/308914/
+10_page_Десять вещ.txt https://habr.com/ru/post/169601/
+11_page_Почему ООП.txt https://habr.com/ru/post/307040/
+12_page_Записки пр.txt https://habr.com/ru/post/93931/
+13_page_Эволюция п.txt https://habr.com/ru/post/129247/
+14_page_Зачем нам .txt https://habr.com/ru/post/148015/
+15_page_Почему все.txt https://habr.com/ru/post/148088/
+16_page_Как «Змейк.txt https://habr.com/ru/company/geekbrains/blog/268741/
+17_page_Javascript.txt https://habr.com/ru/post/144646/
+18_page_Зачем ООП.txt https://habr.com/ru/post/111162/
+19_page_Когда испо.txt https://habr.com/ru/post/247285/
+20_page_Перевод: П.txt https://habr.com/ru/post/415193/
+21_page_Франсиско .txt https://habr.com/ru/post/41892/
+22_page_Бумажные д.txt https://habr.com/ru/post/398887/
+23_page_Как зарабо.txt https://habr.com/ru/post/10785/
+24_page_Зачем мне .txt https://habr.com/ru/post/25837/
+25_page_Электронны.txt https://habr.com/ru/company/skbkontur/blog/128864/
+26_page_Электронны.txt https://habr.com/ru/post/236095/
+27_page_Какие день.txt https://habr.com/ru/post/296800/
+28_page_Куда пропа.txt https://habr.com/ru/company/ubank/blog/232837/
+29_page_Как сохран.txt https://habr.com/ru/post/130720/
+30_page_Рисуем эле.txt https://habr.com/ru/post/191996/
+31_page_Bitcoin не.txt https://habr.com/ru/post/345578/
+32_page_Россияне н.txt https://habr.com/ru/post/15329/
+33_page_Заставь се.txt https://habr.com/ru/post/31312/
+34_page_Для чего н.txt https://habr.com/ru/company/qiwi/blog/90483/
+35_page_Деньги как.txt https://habr.com/ru/post/240131/
+36_page_Как зарабо.txt https://habr.com/ru/post/5700/
+37_page_Поговорим .txt https://habr.com/ru/post/18613/
+38_page_О безналич.txt https://habr.com/ru/post/30205/
+39_page_Треугольни.txt https://habr.com/ru/post/52538/
+40_page_О времени .txt https://habr.com/ru/post/88922/
+41_page_Как купить.txt https://habr.com/ru/post/119899/
+42_page_Как купить.txt https://habr.com/ru/post/120419/
+43_page_История ра.txt https://habr.com/ru/company/vistlan/blog/257791/
+44_page_Как новые .txt https://habr.com/ru/post/297678/
+45_page_Советы зап.txt https://habr.com/ru/post/312702/
+46_page_Больше, че.txt https://habr.com/ru/company/mosigra/blog/353016/
+47_page_Путь от ус.txt https://habr.com/ru/post/79551/
+48_page_Итоги рейт.txt https://habr.com/ru/post/85910/
+49_page_Почему руш.txt https://habr.com/ru/post/127805/
+50_page_Почему неб.txt https://habr.com/ru/company/iticapital/blog/236883/
+51_page_Руководств.txt https://habr.com/ru/post/238003/
+52_page_Регистраци.txt https://habr.com/ru/post/244445/
+53_page_Регистраци.txt https://habr.com/ru/post/246713/
+54_page_Лекции Тех.txt https://habr.com/ru/company/mailru/blog/273335/
+55_page_История од.txt https://habr.com/ru/post/290810/
+56_page_История од.txt https://habr.com/ru/post/291290/
+57_page_Стратегия .txt https://habr.com/ru/company/alconost/blog/292572/
+58_page_Компания н.txt https://habr.com/ru/company/polyglot/blog/293394/
+59_page_Как взлома.txt https://habr.com/ru/company/mbaconsult/blog/298148/
+60_page_Регистраци.txt https://habr.com/ru/company/lawboot/blog/298378/
+61_page_Интервью б.txt https://habr.com/ru/company/wirex/blog/392027/
+62_page_Собеседова.txt https://habr.com/ru/post/283880/
+63_page_Идеальное .txt https://habr.com/ru/post/370831/
+64_page_Собеседова.txt https://habr.com/ru/post/169949/
+65_page_За пять дн.txt https://habr.com/ru/company/everydaytools/blog/342104/
+66_page_Синдром са.txt https://habr.com/ru/post/429158/
+67_page_Senior Eng.txt https://habr.com/ru/post/442442/
+68_page_Senior Eng.txt https://habr.com/ru/post/434864/
+69_page_Первое соб.txt https://habr.com/ru/company/dell/blog/246701/
+70_page_Техническо.txt https://habr.com/ru/company/cit/blog/262887/
+71_page_23 вопроса.txt https://habr.com/ru/company/icanchoose/blog/296152/
+72_page_Собеседова.txt https://habr.com/ru/post/305340/
+73_page_Как расска.txt https://habr.com/ru/company/alconost/blog/328200/
+74_page_40 необычн.txt https://habr.com/ru/post/330932/
+75_page_Как я прох.txt https://habr.com/ru/post/338102/
+76_page_Собеседова.txt https://habr.com/ru/company/skillbox/blog/412823/
+77_page_Чему я нау.txt https://habr.com/ru/company/everydaytools/blog/413941/
+78_page_Senior Eng.txt https://habr.com/ru/post/430222/
+79_page_Пройди тех.txt https://habr.com/ru/company/mbaconsult/blog/304918/
+80_page_Собеседова.txt https://habr.com/ru/post/106832/
+81_page_Шпаргалка .txt https://habr.com/ru/post/266821/
+82_page_Шпаргалка .txt https://habr.com/ru/company/luxoft/blog/272025/
+83_page_Шпаргалка .txt https://habr.com/ru/company/luxoft/blog/280784/
+84_page_Чисто эксп.txt https://habr.com/ru/post/313888/
+85_page_Корректное.txt https://habr.com/ru/company/haulmont/blog/421413/
+86_page_Определяем.txt https://habr.com/ru/post/141699/
+87_page_Автономная.txt https://habr.com/ru/post/176237/
+88_page_Java навсе.txt https://habr.com/ru/post/201612/
+89_page_1000+ часо.txt https://habr.com/ru/company/golovachcourses/blog/215275/
+90_page_Шпаргалка .txt https://habr.com/ru/post/265061/
+91_page_Java и вре.txt https://habr.com/ru/post/274811/
+92_page_Шпаргалка .txt https://habr.com/ru/company/luxoft/blog/280782/
+93_page_Как в Java.txt https://habr.com/ru/post/312894/
+94_page_Java приме.txt https://habr.com/ru/post/319852/
+95_page_Инстанциру.txt https://habr.com/ru/post/341930/
+96_page_Обзор прог.txt https://habr.com/ru/company/jugru/blog/349442/
+97_page_Личный опы.txt https://habr.com/ru/post/412775/
+98_page_Руководств.txt https://habr.com/ru/company/piter/blog/417733/
+99_page_Пишем Java.txt https://habr.com/ru/company/jugru/blog/417951/
+100_page_[Перевод] .txt https://habr.com/ru/post/419637/

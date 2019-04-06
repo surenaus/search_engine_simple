@@ -1,0 +1,542 @@
+Корректное получение доступа к default методам интерфейсов через рефлексию в Java 8, 9, 10
+Примечание переводчика: развитие фреймворка CUBA порождает большое количество R&D проектов. В ходе одного такого проекта выяснилось, что нам нужно вызывать default методы интерфейсов из прокси классов. Наткнулись на очень полезную статью, мне кажется, что опыт, изложенный в ней, будет, как минимум интересен, как максимум — полезен широкому кругу разработчиков. 
+
+Когда дело касается доступа к default методам интерфейсов в Java через рефлексию, гугление не очень помогает. Например, решение на StackOverflow работает только в определенных ситуациях и не на всех версиях Java.
+
+В этой статье будут рассмотрены различные подходы к вызовам default методов интерфейсов через рефлексию, это может быть нужно, например, при создании прокси-классов.
+
+TL;DR Если вам не терпится, то все способы вызова default методов, описанные в этой статье, доступны по этой ссылке, а также эта проблема уже решена в нашей библиотеке jOOR. 
+
+Проксирование интерфейсов с default методами
+Полезный API java.lang.reflect.Proxy существует достаточно давно, с его помощью мы можем делать клевые штуки, например:
+
+import java.lang.reflect.Proxy;
+ 
+public class ProxyDemo {
+    interface Duck {
+        void quack();
+    }
+ 
+    public static void main(String[] a) {
+        Duck duck = (Duck) Proxy.newProxyInstance(
+            Thread.currentThread().getContextClassLoader(),
+            new Class[] { Duck.class },
+            (proxy, method, args) -> {
+                System.out.println("Quack");
+                return null;
+            }
+        );
+ 
+        duck.quack();
+    }
+}
+
+Этот код просто выводит:
+
+Quack
+
+В этом примере мы создали экземпляр прокси, который реализует API интерфейса Duck с использованием InvocationHandler, который, по сути, просто лямбда, вызываемая для каждого метода интерфейса Duck. 
+
+Интересное начнется, когда мы захотим добавить реализацию метода в интерфейс и делегировать вызов в этот метод:
+
+interface Duck {
+    default void quack() {
+        System.out.println("Quack");
+    }
+}
+
+Скорее всего, захочется написать такой код:
+
+import java.lang.reflect.Proxy;
+ 
+public class ProxyDemo {
+    interface Duck {
+        default void quack() {
+            System.out.println("Quack");
+        }
+    }
+ 
+    public static void main(String[] a) {
+        Duck duck = (Duck) Proxy.newProxyInstance(
+            Thread.currentThread().getContextClassLoader(),
+            new Class[] { Duck.class },
+            (proxy, method, args) -> {
+                method.invoke(proxy);
+                return null;
+            }
+        );
+ 
+        duck.quack();
+    }
+}
+
+Но это всего лишь сгенерирует длиннющий стек вложенных исключений (и это не связано с вызовом реализации метода в интерфейсе, так просто запрещено делать):
+
+Exception in thread "main" java.lang.reflect.UndeclaredThrowableException
+	at $Proxy0.quack(Unknown Source)
+	at ProxyDemo.main(ProxyDemo.java:20)
+Caused by: java.lang.reflect.InvocationTargetException
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at ProxyDemo.lambda$0(ProxyDemo.java:15)
+	... 2 more
+Caused by: java.lang.reflect.UndeclaredThrowableException
+	at $Proxy0.quack(Unknown Source)
+	... 7 more
+Caused by: java.lang.reflect.InvocationTargetException
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at ProxyDemo.lambda$0(ProxyDemo.java:15)
+	... 8 more
+Caused by: java.lang.reflect.UndeclaredThrowableException
+	at $Proxy0.quack(Unknown Source)
+	... 13 more
+Caused by: java.lang.reflect.InvocationTargetException
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at ProxyDemo.lambda$0(ProxyDemo.java:15)
+	... 14 more
+Caused by: java.lang.reflect.UndeclaredThrowableException
+	at $Proxy0.quack(Unknown Source)
+	... 19 more
+...
+...
+... goes on forever
+
+Не очень-то полезно.
+
+Использование Method Handles API
+Так, поиск в Гугле выдает нам, что нужно использовать MethodHandles API. Ну что, давайте попробуем!
+
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Proxy;
+ 
+public class ProxyDemo {
+    interface Duck {
+        default void quack() {
+            System.out.println("Quack");
+        }
+    }
+ 
+    public static void main(String[] a) {
+        Duck duck = (Duck) Proxy.newProxyInstance(
+            Thread.currentThread().getContextClassLoader(),
+            new Class[] { Duck.class },
+            (proxy, method, args) -> {
+                MethodHandles
+                    .lookup()
+                    .in(Duck.class)
+                    .unreflectSpecial(method, Duck.class)
+                    .bindTo(proxy)
+                    .invokeWithArguments();
+                return null;
+            }
+        );
+ 
+        duck.quack();
+    }
+}
+
+Круто, похоже, что заработало! 
+
+Quack
+
+… но нет.
+
+Вызов метода интерфейса с не приватным доступом
+Интерфейс из примера выше был аккуратно сделан так, чтобы у вызывающего кода к нему был приватный доступ, т.е. интерфейс был вложен в вызывающий класс. А что, если у нас есть не вложенный интерфейс?
+
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Proxy;
+ 
+interface Duck {
+    default void quack() {
+        System.out.println("Quack");
+    }
+}
+ 
+public class ProxyDemo {
+    public static void main(String[] a) {
+        Duck duck = (Duck) Proxy.newProxyInstance(
+            Thread.currentThread().getContextClassLoader(),
+            new Class[] { Duck.class },
+            (proxy, method, args) -> {
+                MethodHandles
+                    .lookup()
+                    .in(Duck.class)
+                    .unreflectSpecial(method, Duck.class)
+                    .bindTo(proxy)
+                    .invokeWithArguments();
+                return null;
+            }
+        );
+       duck.quack();
+    }
+}
+
+Почти такой же код больше не работает. Получаем исключение IllegalAccessException:
+
+Exception in thread "main" java.lang.reflect.UndeclaredThrowableException
+	at $Proxy0.quack(Unknown Source)
+	at ProxyDemo.main(ProxyDemo.java:26)
+Caused by: java.lang.IllegalAccessException: no private access for invokespecial: interface Duck, from Duck/package
+	at java.lang.invoke.MemberName.makeAccessException(MemberName.java:850)
+	at java.lang.invoke.MethodHandles$Lookup.checkSpecialCaller(MethodHandles.java:1572)
+	at java.lang.invoke.MethodHandles$Lookup.unreflectSpecial(MethodHandles.java:1231)
+	at ProxyDemo.lambda$0(ProxyDemo.java:19)
+	... 2 more
+
+Фигня вышла. Если погуглить еще, можно найти следующее решение, которое получает доступ к внутренностям MethodHandles.Lookup через рефлексию.
+
+import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Proxy;
+ 
+interface Duck {
+    default void quack() {
+        System.out.println("Quack");
+    }
+}
+ 
+public class ProxyDemo {
+    public static void main(String[] a) {
+        Duck duck = (Duck) Proxy.newProxyInstance(
+            Thread.currentThread().getContextClassLoader(),
+            new Class[] { Duck.class },
+            (proxy, method, args) -> {
+                Constructor<Lookup> constructor = Lookup.class
+                    .getDeclaredConstructor(Class.class);
+                constructor.setAccessible(true);
+                constructor.newInstance(Duck.class)
+                    .in(Duck.class)
+                    .unreflectSpecial(method, Duck.class)
+                    .bindTo(proxy)
+                    .invokeWithArguments();
+                return null;
+            }
+        );
+ 
+        duck.quack();
+    }
+}
+
+И, ура, мы получаем:
+
+Quack
+
+У нас получилось сделать это на JDK 8. Как насчет JDK 9 или 10?
+
+WARNING: An illegal reflective access operation has occurred
+WARNING: Illegal reflective access by ProxyDemo (file:/C:/Users/lukas/workspace/playground/target/classes/) to constructor java.lang.invoke.MethodHandles$Lookup(java.lang.Class)
+WARNING: Please consider reporting this to the maintainers of ProxyDemo
+WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+WARNING: All illegal access operations will be denied in a future release
+Quack
+
+Опачки. Это то, что происходит по умолчанию. Если мы запустим программу с флагом --illegal-access=deny:
+
+java --illegal-access=deny ProxyDemo
+
+Ну, тогда мы получаем (и правильно!):
+
+Exception in thread "main" java.lang.reflect.InaccessibleObjectException: Unable to make java.lang.invoke.MethodHandles$Lookup(java.lang.Class) accessible: module java.base does not "opens java.lang.invoke" to unnamed module @357246de
+        at java.base/java.lang.reflect.AccessibleObject.checkCanSetAccessible(AccessibleObject.java:337)
+        at java.base/java.lang.reflect.AccessibleObject.checkCanSetAccessible(AccessibleObject.java:281)
+        at java.base/java.lang.reflect.Constructor.checkCanSetAccessible(Constructor.java:192)
+        at java.base/java.lang.reflect.Constructor.setAccessible(Constructor.java:185)
+        at ProxyDemo.lambda$0(ProxyDemo.java:18)
+        at $Proxy0.quack(Unknown Source)
+        at ProxyDemo.main(ProxyDemo.java:28)
+
+Одна из целей проекта Jigsaw была как раз именно в том, чтобы не допускать подобных хаков. Так, а какое решение лучше? Это?
+
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Proxy;
+ 
+interface Duck {
+    default void quack() {
+        System.out.println("Quack");
+    }
+}
+ 
+public class ProxyDemo {
+    public static void main(String[] a) {
+        Duck duck = (Duck) Proxy.newProxyInstance(
+            Thread.currentThread().getContextClassLoader(),
+            new Class[] { Duck.class },
+            (proxy, method, args) -> {
+                MethodHandles.lookup()
+                    .findSpecial( 
+                         Duck.class, 
+                         "quack",  
+                         MethodType.methodType( 
+                             void.class, 
+                             new Class[0]),  
+                         Duck.class)
+                    .bindTo(proxy)
+                    .invokeWithArguments();
+                return null;
+            }
+        );
+ 
+        duck.quack();
+    }
+}
+
+Quack
+
+Отлично, это работает в Java 9 и 10, а как насчет Java 8?
+
+Exception in thread "main" java.lang.reflect.UndeclaredThrowableException
+	at $Proxy0.quack(Unknown Source)
+	at ProxyDemo.main(ProxyDemo.java:25)
+Caused by: java.lang.IllegalAccessException: no private access for invokespecial: interface Duck, from ProxyDemo
+	at java.lang.invoke.MemberName.makeAccessException(MemberName.java:850)
+	at java.lang.invoke.MethodHandles$Lookup.checkSpecialCaller(MethodHandles.java:1572)
+	at java.lang.invoke.MethodHandles$Lookup.findSpecial(MethodHandles.java:1002)
+	at ProxyDemo.lambda$0(ProxyDemo.java:18)
+	... 2 more
+
+Вы издеваетесь, да?
+
+Итак, у нас есть решение (хак), которое работает в Java 8, но не в 9 и 10, и есть решение, которое работает в 9 и 10, но не в 8
+
+Более глубокое исследование
+Ну что, я только что попробовал запустить разный код на разных JDK. Следующий класс пробует все вышеперечисленные комбинации. Он также доступен в виде GIST здесь.
+
+Компилируйте код с использованием JDK 9 или 10 (потому что требуется JDK 9+ API: MethodHandles.privateLookupIn()), но компилировать нужно командой, указанной ниже, чтобы можно было запустить класс на JDK 8:
+
+javac -source 1.8 -target 1.8 CallDefaultMethodThroughReflection.java
+
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+ 
+ 
+interface PrivateInaccessible {
+    default void quack() {
+        System.out.println(" -> PrivateInaccessible.quack()");
+    }
+}
+ 
+public class CallDefaultMethodThroughReflection {
+    interface PrivateAccessible {
+        default void quack() {
+            System.out.println(" -> PrivateAccessible.quack()");
+        }
+    }
+ 
+    public static void main(String[] args) {
+        System.out.println("PrivateAccessible");
+        System.out.println("-----------------");
+        System.out.println();
+        proxy(PrivateAccessible.class).quack();
+ 
+        System.out.println();
+        System.out.println("PrivateInaccessible");
+        System.out.println("-------------------");
+        System.out.println();
+        proxy(PrivateInaccessible.class).quack();
+    }
+ 
+    private static void quack(Lookup lookup, Class<?> type, Object proxy) {
+        System.out.println("Lookup.in(type).unreflectSpecial(...)");
+ 
+        try {
+            lookup.in(type)
+                  .unreflectSpecial(type.getMethod("quack"), type)
+                  .bindTo(proxy)
+                  .invokeWithArguments();
+        }
+        catch (Throwable e) {
+            System.out.println(" -> " + e.getClass() + ": " + e.getMessage());
+        }
+ 
+        System.out.println("Lookup.findSpecial(...)");
+        try {
+            lookup.findSpecial(type, "quack", MethodType.methodType(void.class, new Class[0]), type)
+                  .bindTo(proxy)
+                  .invokeWithArguments();
+        }
+        catch (Throwable e) {
+            System.out.println(" -> " + e.getClass() + ": " + e.getMessage());
+        }
+    }
+ 
+    @SuppressWarnings("unchecked")
+    private static <T> T proxy(Class<T> type) {
+        return (T) Proxy.newProxyInstance(
+            Thread.currentThread().getContextClassLoader(),
+            new Class[] { type },
+            (Object proxy, Method method, Object[] arguments) -> {
+                System.out.println("MethodHandles.lookup()");
+                quack(MethodHandles.lookup(), type, proxy);
+ 
+                try {
+                    System.out.println();
+                    System.out.println("Lookup(Class)");
+                    Constructor<Lookup> constructor = Lookup.class.getDeclaredConstructor(Class.class);
+                    constructor.setAccessible(true);
+                    constructor.newInstance(type);
+                    quack(constructor.newInstance(type), type, proxy);
+                }
+                catch (Exception e) {
+                    System.out.println(" -> " + e.getClass() + ": " + e.getMessage());
+                }
+ 
+                try {
+                    System.out.println();
+                    System.out.println("MethodHandles.privateLookupIn()");
+                    quack(MethodHandles.privateLookupIn(type, MethodHandles.lookup()), type, proxy);
+                }
+                catch (Error e) {
+                    System.out.println(" -> " + e.getClass() + ": " + e.getMessage());
+                }
+ 
+                return null;
+            }
+        );
+    }
+}
+
+Вывод вышеприведенной программы:
+
+Java 8
+$ java -version
+java version "1.8.0_141"
+Java(TM) SE Runtime Environment (build 1.8.0_141-b15)
+Java HotSpot(TM) 64-Bit Server VM (build 25.141-b15, mixed mode)
+
+$ java CallDefaultMethodThroughReflection
+PrivateAccessible
+-----------------
+
+MethodHandles.lookup()
+Lookup.in(type).unreflectSpecial(...)
+ -> PrivateAccessible.quack()
+Lookup.findSpecial(...)
+ -> class java.lang.IllegalAccessException: no private access for invokespecial: interface CallDefaultMethodThroughReflection$PrivateAccessible, from CallDefaultMethodThroughReflection
+
+Lookup(Class)
+Lookup.in(type).unreflectSpecial(...)
+ -> PrivateAccessible.quack()
+Lookup.findSpecial(...)
+ -> PrivateAccessible.quack()
+
+MethodHandles.privateLookupIn()
+ -> class java.lang.NoSuchMethodError: java.lang.invoke.MethodHandles.privateLookupIn(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;
+
+PrivateInaccessible
+-------------------
+
+MethodHandles.lookup()
+Lookup.in(type).unreflectSpecial(...)
+ -> class java.lang.IllegalAccessException: no private access for invokespecial: interface PrivateInaccessible, from PrivateInaccessible/package
+Lookup.findSpecial(...)
+ -> class java.lang.IllegalAccessException: no private access for invokespecial: interface PrivateInaccessible, from CallDefaultMethodThroughReflection
+
+Lookup(Class)
+Lookup.in(type).unreflectSpecial(...)
+ -> PrivateInaccessible.quack()
+Lookup.findSpecial(...)
+ -> PrivateInaccessible.quack()
+
+MethodHandles.privateLookupIn()
+ -> class java.lang.NoSuchMethodError: java.lang.invoke.MethodHandles.privateLookupIn(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;
+
+Java 9
+$ java -version
+java version "9.0.4"
+Java(TM) SE Runtime Environment (build 9.0.4+11)
+Java HotSpot(TM) 64-Bit Server VM (build 9.0.4+11, mixed mode)
+
+$ java --illegal-access=deny CallDefaultMethodThroughReflection
+PrivateAccessible
+-----------------
+
+MethodHandles.lookup()
+Lookup.in(type).unreflectSpecial(...)
+ -> PrivateAccessible.quack()
+Lookup.findSpecial(...)
+ -> PrivateAccessible.quack()
+
+Lookup(Class)
+ -> class java.lang.reflect.InaccessibleObjectException: Unable to make java.lang.invoke.MethodHandles$Lookup(java.lang.Class) accessible: module java.base does not "opens java.lang.invoke" to unnamed module @30c7da1e
+
+MethodHandles.privateLookupIn()
+Lookup.in(type).unreflectSpecial(...)
+ -> PrivateAccessible.quack()
+Lookup.findSpecial(...)
+ -> PrivateAccessible.quack()
+
+PrivateInaccessible
+-------------------
+
+MethodHandles.lookup()
+Lookup.in(type).unreflectSpecial(...)
+ -> class java.lang.IllegalAccessException: no private access for invokespecial: interface PrivateInaccessible, from PrivateInaccessible/package (unnamed module @30c7da1e)
+Lookup.findSpecial(...)
+ -> PrivateInaccessible.quack()
+
+Lookup(Class)
+ -> class java.lang.reflect.InaccessibleObjectException: Unable to make java.lang.invoke.MethodHandles$Lookup(java.lang.Class) accessible: module java.base does not "opens java.lang.invoke" to unnamed module @30c7da1e
+
+MethodHandles.privateLookupIn()
+Lookup.in(type).unreflectSpecial(...)
+ -> PrivateInaccessible.quack()
+Lookup.findSpecial(...)
+ -> PrivateInaccessible.quack()
+
+Java 10
+$ java -version
+java version "10" 2018-03-20
+Java(TM) SE Runtime Environment 18.3 (build 10+46)
+Java HotSpot(TM) 64-Bit Server VM 18.3 (build 10+46, mixed mode)
+
+$ java --illegal-access=deny CallDefaultMethodThroughReflection
+... такой же результат, как в Java 9
+
+Заключение
+Понять все это немного сложновато.
+
+
+В Java 8 наилучший рабочий подход – хак, который влезает во внутренности JDK через доступ к package-private конструктору класса Lookup. Это единственный способ единообразно вызывать методы интерфейсов как с приватным доступом, так и с не приватным доступом из любого класса.
+В Java 9 и 10 лучший способ — использовать Lookup.findSpecial() (не работает в Java 8) или MethodHandles.privateLookupIn() (метод не существует в Java 8). Последний подход нужно использовать, если интерфейс находится в другом модуле. Этот модуль должен предоставлять интерфейс для вызова извне.
+
+Честно сказать, это немного запутанно. Подходящий мем для этого:
+
+
+
+Rafael Winterhalter (автор ByteBuddy) сказал, что, “настоящий” фикс будет в переработанной версии Proxy API:
+
+
+ПереводLukas Eder: «Ты не знаешь причину того, почему решили больше не разрешать так делать? Или просто пропустили это (скорее всего нет)?»
+Rafael Winterhalter:«Нет причины. Это побочный эффект модели безопасности Java для класса Lookup из MethodHandle. В идеале, в прокси интерфейсах должен быть такой Lookup предоставляемый в виде аргумента (конструктора — прим. пер.), но это не рассмотрели. Я безуспешно предлагал похожее расширение для API трансформации файлов классов.»
+
+Я не уверен, что это решит все проблемы, но нужно действительно сделать так, чтобы разработчик не беспокоился обо всем вышесказанном.
+
+И ясно, что эта статья не полная, например, не тестировалось, будут ли эти подходы работать, если Duck импортирован из другого модуля:
+
+
+ПереводJOOQ:название и ссылка на статью
+Rafael Winterhalter:«А ты пробовал поместить Duck в модуль, который экспортирует, но не открывает пакет интерфейса? Готов поспорить, что твое решение для Java 9+ не заработает, если будет использоваться module path.»
+
+… и это будет тема следующей статьи.
+
+Использование jOOR
+Если вы используете jOOR (нашу библиотеку для reflection API, она тут), то версия 0.9.8 будет включать фикс для этого: github.com/jOOQ/jOOR/issues/49
+Фикс просто использует подход с хаком Reflection API в Java 8 или MethodHandles.privateLookupIn() для Java 9+. Можно писать:
+
+Reflect.on(new Object()).as(PrivateAccessible.class).quack();
+Reflect.on(new Object()).as(PrivateInaccessible.class).quack();
+

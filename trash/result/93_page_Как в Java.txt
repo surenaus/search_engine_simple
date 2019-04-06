@@ -1,0 +1,416 @@
+Как в Java выстрелить себе в ногу из лямбды и не промахнуться
+Иногда можно услышать такие разговоры: никаких принципиальных изменений в Java 8 не произошло и лямбды это старые добрые анонимные классы щедро посыпанные синтаксическим сахаром. Как бы не так! Предлагаю сегодня поговорить, в чём отличие лямбд от анонимных классов. И почему попасть себе в ногу стало всё-таки сложнее.
+
+Чтобы не отнимать время у тех, кто считает что уже освоился с анонимными функциями, простенькая задачка. Чем отличаются два фрагмента кода ниже:
+
+public class AnonymousClass {
+    public Runnable getRunnable() {
+        return new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("I am a Runnable!");
+            }
+        };
+    }
+
+    public static void main(String[] args) {
+        new AnonymousClass().getRunnable().run();
+    }
+}
+
+И второй фрагмент:
+
+public class Lambda {
+    public Runnable getRunnable() {
+        return () -> System.out.println("I am a Runnable!");
+    }
+
+    public static void main(String[] args) {
+        new Lambda().getRunnable().run();
+    }
+}
+
+Если можете сходу ответить — решайте сами, хотите ли читать дальше.
+
+Декомпилируем
+Смотрим байт код для обоих вариантов. (Подробная декомпиляция с флажком -verbose — под спойлером.)
+
+С анонимным классом
+
+Compiled from "AnonymousClass.java"
+public class AnonymousClass {
+  public AnonymousClass();
+    Code:
+       0: aload_0
+       1: invokespecial #1          // Method java/lang/Object."<init>":()V
+       4: return
+
+  public java.lang.Runnable getRunnable();
+    Code:
+       0: new           #2          // class AnonymousClass$1
+       3: dup
+       4: aload_0
+       5: invokespecial #3          // Method AnonymousClass$1."<init>":(LAnonymousClass;)V
+       8: areturn
+
+  public static void main(java.lang.String[]);
+    Code:
+       0: new           #4          // class AnonymousClass
+       3: dup
+       4: invokespecial #5          // Method "<init>":()V
+       7: invokevirtual #6          // Method getRunnable:()Ljava/lang/Runnable;
+      10: invokeinterface #7,  1    // InterfaceMethod java/lang/Runnable.run:()V
+      15: return
+}
+
+RunnableAnonymousClassExperiment.class (подробная декомпиляция)Classfile /E:/.../src/main/java/AnonymousClass.class
+  Last modified 17.10.2016; size 518 bytes
+  MD5 checksum cf61f38da50d7062537edefea71995dc
+  Compiled from "AnonymousClass.java"
+public class AnonymousClass
+  minor version: 0
+  major version: 52
+  flags: ACC_PUBLIC, ACC_SUPER
+Constant pool:
+   #1 = Methodref          #8.#20         // java/lang/Object."<init>":()V
+   #2 = Class              #21            // AnonymousClass$1
+   #3 = Methodref          #2.#22         // AnonymousClass$1."<init>":(LAnonymousClass;)V
+   #4 = Class              #23            // AnonymousClass
+   #5 = Methodref          #4.#20         // AnonymousClass."<init>":()V
+   #6 = Methodref          #4.#24         // AnonymousClass.getRunnable:()Ljava/lang/Runnable;
+   #7 = InterfaceMethodref #25.#26        // java/lang/Runnable.run:()V
+   #8 = Class              #27            // java/lang/Object
+   #9 = Utf8               InnerClasses
+  #10 = Utf8               <init>
+  #11 = Utf8               ()V
+  #12 = Utf8               Code
+  #13 = Utf8               LineNumberTable
+  #14 = Utf8               getRunnable
+  #15 = Utf8               ()Ljava/lang/Runnable;
+  #16 = Utf8               main
+  #17 = Utf8               ([Ljava/lang/String;)V
+  #18 = Utf8               SourceFile
+  #19 = Utf8               AnonymousClass.java
+  #20 = NameAndType        #10:#11        // "<init>":()V
+  #21 = Utf8               AnonymousClass$1
+  #22 = NameAndType        #10:#28        // "<init>":(LAnonymousClass;)V
+  #23 = Utf8               AnonymousClass
+  #24 = NameAndType        #14:#15        // getRunnable:()Ljava/lang/Runnable;
+  #25 = Class              #29            // java/lang/Runnable
+  #26 = NameAndType        #30:#11        // run:()V
+  #27 = Utf8               java/lang/Object
+  #28 = Utf8               (LAnonymousClass;)V
+  #29 = Utf8               java/lang/Runnable
+  #30 = Utf8               run
+{
+  public AnonymousClass();
+    descriptor: ()V
+    flags: ACC_PUBLIC
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+         4: return
+      LineNumberTable:
+        line 1: 0
+
+  public java.lang.Runnable getRunnable();
+    descriptor: ()Ljava/lang/Runnable;
+    flags: ACC_PUBLIC
+    Code:
+      stack=3, locals=1, args_size=1
+         0: new           #2                  // class AnonymousClass$1
+         3: dup
+         4: aload_0
+         5: invokespecial #3                  // Method AnonymousClass$1."<init>":(LAnonymousClass;)V
+         8: areturn
+      LineNumberTable:
+        line 3: 0
+
+  public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=2, locals=1, args_size=1
+         0: new           #4                  // class AnonymousClass
+         3: dup
+         4: invokespecial #5                  // Method "<init>":()V
+         7: invokevirtual #6                  // Method getRunnable:()Ljava/lang/Runnable;
+        10: invokeinterface #7,  1            // InterfaceMethod java/lang/Runnable.run:()V
+        15: return
+      LineNumberTable:
+        line 12: 0
+        line 13: 15
+}
+SourceFile: "AnonymousClass.java"
+InnerClasses:
+     #2; //class AnonymousClass$1
+
+С лямбдой
+
+Compiled from "Lambda.java"
+public class Lambda {
+  public Lambda();
+    Code:
+       0: aload_0
+       1: invokespecial #1          // Method java/lang/Object."<init>":()V
+       4: return
+
+  public java.lang.Runnable getRunnable();
+    Code:
+       0: invokedynamic #2,  0      // InvokeDynamic #0:run:()Ljava/lang/Runnable;
+       5: areturn
+
+  public static void main(java.lang.String[]);
+    Code:
+       0: new           #3          // class Lambda
+       3: dup
+       4: invokespecial #4          // Method "<init>":()V
+       7: invokevirtual #5          // Method getRunnable:()Ljava/lang/Runnable;
+      10: invokeinterface #6,  1    // InterfaceMethod java/lang/Runnable.run:()V
+      15: return
+}
+
+Lambda.class (подробная декомпиляция)Classfile /E:/.../src/main/java/Lambda.class
+  Last modified 17.10.2016; size 1095 bytes
+  MD5 checksum f09061410dfbe358c50880576557b64e
+  Compiled from "Lambda.java"
+public class Lambda
+  minor version: 0
+  major version: 52
+  flags: ACC_PUBLIC, ACC_SUPER
+Constant pool:
+   #1 = Methodref          #10.#22        // java/lang/Object."<init>":()V
+   #2 = InvokeDynamic      #0:#27         // #0:run:()Ljava/lang/Runnable;
+   #3 = Class              #28            // Lambda
+   #4 = Methodref          #3.#22         // Lambda."<init>":()V
+   #5 = Methodref          #3.#29         // Lambda.getRunnable:()Ljava/lang/Runnable;
+   #6 = InterfaceMethodref #30.#31        // java/lang/Runnable.run:()V
+   #7 = Fieldref           #32.#33        // java/lang/System.out:Ljava/io/PrintStream;
+   #8 = String             #34            // I am a Runnable!
+   #9 = Methodref          #35.#36        // java/io/PrintStream.println:(Ljava/lang/String;)V
+  #10 = Class              #37            // java/lang/Object
+  #11 = Utf8               <init>
+  #12 = Utf8               ()V
+  #13 = Utf8               Code
+  #14 = Utf8               LineNumberTable
+  #15 = Utf8               getRunnable
+  #16 = Utf8               ()Ljava/lang/Runnable;
+  #17 = Utf8               main
+  #18 = Utf8               ([Ljava/lang/String;)V
+  #19 = Utf8               lambda$getRunnable$0
+  #20 = Utf8               SourceFile
+  #21 = Utf8               Lambda.java
+  #22 = NameAndType        #11:#12        // "<init>":()V
+  #23 = Utf8               BootstrapMethods
+  #24 = MethodHandle       #6:#38         // invokestatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+  #25 = MethodType         #12            //  ()V
+  #26 = MethodHandle       #6:#39         // invokestatic Lambda.lambda$getRunnable$0:()V
+  #27 = NameAndType        #40:#16        // run:()Ljava/lang/Runnable;
+  #28 = Utf8               Lambda
+  #29 = NameAndType        #15:#16        // getRunnable:()Ljava/lang/Runnable;
+  #30 = Class              #41            // java/lang/Runnable
+  #31 = NameAndType        #40:#12        // run:()V
+  #32 = Class              #42            // java/lang/System
+  #33 = NameAndType        #43:#44        // out:Ljava/io/PrintStream;
+  #34 = Utf8               I am a Runnable!
+  #35 = Class              #45            // java/io/PrintStream
+  #36 = NameAndType        #46:#47        // println:(Ljava/lang/String;)V
+  #37 = Utf8               java/lang/Object
+  #38 = Methodref          #48.#49        // java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+  #39 = Methodref          #3.#50         // Lambda.lambda$getRunnable$0:()V
+  #40 = Utf8               run
+  #41 = Utf8               java/lang/Runnable
+  #42 = Utf8               java/lang/System
+  #43 = Utf8               out
+  #44 = Utf8               Ljava/io/PrintStream;
+  #45 = Utf8               java/io/PrintStream
+  #46 = Utf8               println
+  #47 = Utf8               (Ljava/lang/String;)V
+  #48 = Class              #51            // java/lang/invoke/LambdaMetafactory
+  #49 = NameAndType        #52:#56        // metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+  #50 = NameAndType        #19:#12        // lambda$getRunnable$0:()V
+  #51 = Utf8               java/lang/invoke/LambdaMetafactory
+  #52 = Utf8               metafactory
+  #53 = Class              #58            // java/lang/invoke/MethodHandles$Lookup
+  #54 = Utf8               Lookup
+  #55 = Utf8               InnerClasses
+  #56 = Utf8               (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+  #57 = Class              #59            // java/lang/invoke/MethodHandles
+  #58 = Utf8               java/lang/invoke/MethodHandles$Lookup
+  #59 = Utf8               java/lang/invoke/MethodHandles
+{
+  public Lambda();
+    descriptor: ()V
+    flags: ACC_PUBLIC
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+         4: return
+      LineNumberTable:
+        line 1: 0
+
+  public java.lang.Runnable getRunnable();
+    descriptor: ()Ljava/lang/Runnable;
+    flags: ACC_PUBLIC
+    Code:
+      stack=1, locals=1, args_size=1
+         0: invokedynamic #2,  0              // InvokeDynamic #0:run:()Ljava/lang/Runnable;
+         5: areturn
+      LineNumberTable:
+        line 3: 0
+
+  public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=2, locals=1, args_size=1
+         0: new           #3                  // class Lambda
+         3: dup
+         4: invokespecial #4                  // Method "<init>":()V
+         7: invokevirtual #5                  // Method getRunnable:()Ljava/lang/Runnable;
+        10: invokeinterface #6,  1            // InterfaceMethod java/lang/Runnable.run:()V
+        15: return
+      LineNumberTable:
+        line 7: 0
+        line 8: 15
+}
+SourceFile: "Lambda.java"
+InnerClasses:
+     public static final #54= #53 of #57; //Lookup=class java/lang/invoke/MethodHandles$Lookup of class java/lang/invoke/MethodHandles
+BootstrapMethods:
+  0: #24 invokestatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+    Method arguments:
+      #25 ()V
+      #26 invokestatic Lambda.lambda$getRunnable$0:()V
+      #25 ()V
+
+Анализируем
+Что-нибудь бросилось в глаза? Та-та-та-дам…
+
+Анонимный класс:
+
+5: invokespecial #3          // Method AnonymousClass$1."<init>":(LAnonymousClass;)V
+
+Лямбда:
+
+0: invokedynamic #2,  0      // InvokeDynamic #0:run:()Ljava/lang/Runnable;
+Кажется анонимный класс захватил при создании ссылку на порождающий его экземпляр:
+
+AnonymousClass$1."<init>":(LAnonymousClass;)V
+и будет держать её, пока всесильный Сборщик Мусора™ не пометит его как недостижимый и не освободит от этого бремени. Хотя никак эта ссылка внутри не используется, но вот такой он анонимный жадина.
+
+А если серьёзно, то здесь потенциальная утечка памяти, если вы отдаёте экземпляр анонимного класса во внешний мир. С лямбдами это произойдёт только в том случае, если вы явно или неявно ссылаетесь на this в теле анонимной функции. В противном случае, как в этом примере, лямбда ссылки на вызывающий её экземпляр не держит.
+
+Делаем своими руками. Предлагаю всем читателям провести эксперимент и посмотреть что будет в каждом из случаев, если к строке добавить вызов .toString() у порождающего экземляра.
+
+Как в ногу-то попасть? Обещал рассказать!
+Самый простой способ напороться на потенциальную утечку памяти — это использовать внутри лямбды нестатические методы внешнего класса, если вам в реальности неинтересно его внутреннее состояние:
+
+public class LambdaCallsNonStatic {
+    public Runnable getRunnable() {
+        return () -> {
+            nonStaticMethod();
+        };
+    }
+
+    public void nonStaticMethod() {
+        System.out.println("I am a Runnable!");
+    }
+
+    public static void main(String[] args) {
+        new LambdaCallsNonStatic().getRunnable().run();
+    }
+}
+
+Лямбда получит ссылку на экземпляр класса её вызывающий (хотя будет создана один раз, но об этом ниже):
+
+1: invokedynamic #2,  0      // InvokeDynamic #0:run:(LLambdaCallsNonStatic;)...
+
+Декомпиляция LambdaCallsNonStatic.classCompiled from "LambdaCallsNonStatic.java"
+public class LambdaCallsNonStatic {
+  public LambdaCallsNonStatic();
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       4: return
+
+  public java.lang.Runnable getRunnable();
+    Code:
+       0: aload_0
+       1: invokedynamic #2,  0              // InvokeDynamic #0:run:(LLambdaCallsNonStatic;)Ljava/lang/Runnable;
+       6: areturn
+
+  public void nonStaticMethod();
+    Code:
+       0: getstatic     #3                  // Field java/lang/System.out:Ljava/io/PrintStream;
+       3: ldc           #4                  // String I am a Runnable!
+       5: invokevirtual #5                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+       8: return
+
+  public static void main(java.lang.String[]);
+    Code:
+       0: new           #6                  // class LambdaCallsNonStatic
+       3: dup
+       4: invokespecial #7                  // Method "<init>":()V
+       7: invokevirtual #8                  // Method getRunnable:()Ljava/lang/Runnable;
+      10: invokeinterface #9,  1            // InterfaceMethod java/lang/Runnable.run:()V
+      15: return
+}
+
+Решение: объявить используемый метод статическим или вынести его в отдельный утильный класс.
+
+И всё?
+Нет, есть ещё одна замечательная плюшка у лямбд по сравнению с анонимными классами. Если вы когда-нибудь работали в застенках кроваво-энтерпрайзной конторы и не дай боже́ писали такое:
+
+Collections.sort(list, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer o1, Integer o2) {
+                return -Integer.compare(o1, o2);
+            }
+        });
+
+То подходил к вам о мудрейший тимлид и говорил:
+
+Не экономно ты, Фёдор <имя разработчика>, ресурсы корпоративные расходуешь. Давай мы это зарефакторим по-взрослому.
+
+Ведь новый экземпляр компаратора будет создаваться каждый раз при работе этого фрагмента кода. В результате получалась такая портянка:
+
+public class CorporateComparators {
+    public static Comparator<Integer> integerReverseComparator() {
+        return IntegerReverseComparator.INSTANCE;
+    }
+
+    private enum IntegerReverseComparator implements Comparator<Integer> {
+        INSTANCE;
+
+        @Override
+        public int compare(Integer o1, Integer o2) {
+            return -Integer.compare(o1, o2);
+        }
+    }
+}
+
+...
+
+Collections.sort(list, CorporateComparators.integerReverseComparator());
+Удобнее же стало, всё в своём файлике теперь лежит и переиспользовать можно. С последним соглашусь, но удобнее стало разве что если у вас DDR4 вместо серого вещества в голове. Читабельность такого кода не просто падает, а летит в тартарары со сверхзвуковой.
+
+С лямбдами можно держать логику ближе к месту непосредственного использования и не платить за это сверху:
+
+Collections.sort(list, (i1, i2) -> -Integer.compare(i1, i2));
+Анонимная функция, не захватывающая значений из внешнего контекста, будет лёгкой и создаваться один раз. Хотя спецификация не обязывает конкретную реализацию виртуальной машины к такому поведению (15.27.4. Run-Time Evaluation of Lambda Expressions), но в Java HotSpot VM наблюдается именно это.
+
+Версия Явы
+Эксперименты проводились на:
+
+java version "1.8.0_92"
+Java(TM) SE Runtime Environment (build 1.8.0_92-b14)
+Java HotSpot(TM) 64-Bit Server VM (build 25.92-b14, mixed mode)
+
+javac 1.8.0_92
+
+javap 1.8.0_92
+В заключение
+Статья не претендует на сверхстрогость, академичность и полноту, но мне кажется (такой я самонадеянный, сейчас получу в комментариях по первое число) в достаточной мере раскрывает две киллер-фичи, заставляющих ещё больше проникнуться лямбдами. Критика в комментариях, конструктивная и не очень, категорически приветствуется.

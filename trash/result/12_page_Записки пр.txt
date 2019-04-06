@@ -1,0 +1,433 @@
+Записки программиста: ООП, And и Or
+Философия ООП
+
+Инкапсуляция, наследование, полиморфизм… Методы, члены класса, разграничение приватности, абстракция… Как часто я вижу статьи на тему ООП и как часто не вижу самого ООП в этих статьях. Не вижу настоящего, живого объектно-ориентированного программирования. Авторы владеют терминологией, могут привести тысячу определений пресловутого ООП, вспомнят пару классических примеров с простеньким наследованием, везде напихают утверждений, что инкапсуляция — это хорошо…
+
+
+
+Да, инкапсуляция — это хорошо, но это не суть ООП. Как не суть все остальные термины. Не суть даже то, что в ООП принято оперировать классами. На самом деле, слово «принято» — неправильное. В ООП можно оперировать классами, и удобно работать именно с классами, однако существуют подходы, когда классов нет, а ООП — есть. Как так, почему? Разве класс — не самая главная часть ООП, разве его можно выбросить, разве останется ООП, избавься мы от классов? Останется. Ведь что есть «класс»? Инструмент, сложный многофункциональный инструмент. А что есть «ООП»? Философия. Философия взаимодействия, философия программистского мышления, философия, в которой есть законы и правила, способы и методики, инструменты и материал. Вы можете выгнать музыканта из-за фортепиано, — он возьмет флейту. Отберите флейту, — музыкант натянет струну и изобразит мелодию. Завяжите ему руки, и он просто станет напевать: музыка в нем самом.
+
+ООП подобно музыке. Его можно изучать в теории: обширные партитуры ООП-кода, гордый скрипичный абстрактный класс, ноты-классы в связках, бемоли наследников, рефреном идущая перегрузка методов, и еще пара ловких переходов с размера на размер, чтобы достичь определенного эффекта… С практикой тоже всё хорошо. Сложите простую мелодию с помощью металлофона, постучав молоточком по чужим классам, выучите гитарные аккорды, — и скомпонуйте простую программу со стандартными решениями, стандартными алгоритмами, стандартными подходами. Хотите что-то нестандартное? Тогда вам — в музыкальную школу. В ней вас научат играть на разных инструментах и правильно сочетать их, вы узнаете про паттерны проектирования, шаблонные классы, абстрагирование от алгоритмов, сокрытие информации, и много чего еще. Вы вдруг поймете, что сочинять мелодию — тоже искусство. Прошлые ваши поделки покажутся вам грубыми, аморфными, безобразными, и вы удивитесь, что раньше писали так неуклюже. Вон там лучше было бы создать класс и перенести в него часть функций; здесь лучше воспользоваться стандартным решением, чем придумывать свое; а вот этот неочевидный обходной маневр решается всего-навсего абстрактным классом и тремя простейшими наследниками… Знайте: вы на верном пути. Вы уже понимаете, что ООП — это не ноты, но музыка, и вы учитесь гармонии. Теперь, чтобы дирижировать оркестром ООП или быть хорошим композитором, осталось совсем немного, всего-то лишь закончить консерваторию. Там вы не только изучаете музыку, — вы учитесь ее чувствовать, дышать ею, думать ею.
+
+Проблема And и Or
+
+В своей работе над 0.4 версией ORM для Qt я столкнулся с интересной программистской проблемой и смог ее красиво решить. Мне захотелось поделиться мыслями с кем-то еще, и я стал записывать их в виде отрывочных фраз. Вскоре я взялся за более содержательные предложения, — так появились эти записки программиста.
+
+В моей ORM-библиотеке QST, о 0.3 версии которой я уже писал на Хабре, пока нет генерации сложных запросов, и это как раз то, что я хочу реализовать сейчас. Но где сложные запросы, там и большие условные конструкции, которые попробуй разбери на приоритетность. Все эти вложенные AND и OR условия, да еще если без скобок, — с ума можно сойти, пока придумаешь, как это лучше сделать. Я понял, что мне прежде всего нужен класс для одного маленького простого условия. Пусть это будет QstCondition, — и ничего, что длинное название. На этапе предварительного проектирования сойдет и так.
+
+Сначала я расписал на бумажке, каким хотел бы видеть код на С++, если бы класс QstCondition у меня уже был.
+
+Для начала «запрограммируем» простые условия. F1 и F2 — это поля в SQL-запросе.
+
+F1 = F2
+F1 = 5
+5 = 5
+
+Я бы хотел создавать экземпляры класса QstCondition разнообразными способами.
+
+QstCondition("F1", FunctorEqual, "F2")
+QstCondition("F1", FunctorEqual, QVariant(5))
+QstCondition("F1 = F2")
+QstCondition(QVariant(5), FunctorEqual, QVariant(5))
+QstCondition("F1 = ", QVariant(5))
+
+В моей библиотеке есть класс QstField, — абстракция над полем в SQL-понимании, QstValue — абстракция над константой. Класс QstCondition должен их понимать.
+
+QstCondition(QstField("F1"), FunctorEqual, "F2")
+ 
+// Здесь матрешка: в QstCondition передается QstField, в который передается QstValue, в который передается QVariant. Запись можно чуть-чуть укоротить, оставив 5 вместо QVariant(5).
+QstCondition(QstField("F1", QstValue(QVariant(5), FunctorEqual)))
+ 
+QstCondition(QstField("F1"), FunctorEqual, QstField("F2"))
+QstCondition(QstValue(QVariant(5)), FunctorEqual, QVariant(5))
+QstCondition(QstValue(QVariant(5), FunctorEqual), QVariant(5))
+
+Какие же должны быть конструкторы для всех этих случаев? В первом приближении получилось пять штук:
+
+(1) QstCondition(QString field1, CompareFunctor functor, QString field2)
+(2) QstCondition(QString field1, CompareFunctor functor, QVariant value)
+(3) QstCondition(QVariant value1, CompareFunctor functor, QVariant value2)
+(4) QstCondition(QString stringCondition)
+(5) QstCondition(QstField qstField1, CompareFunctor functor, QstField qstField2)
+
+Я уже понимаю, что далее у меня есть два варианта развития. Где-то внутри класса QstCondition будут лежать имена полей, функтор, значения. Можно было бы положить имена полей в две строки, что-то вроде:
+
+QstCondition {
+  QString _fieldName1, _fieldName2;
+  QVariant _value1, _value2;
+  CompareFunctor _functor;
+}
+
+Что же тогда делать с пятым конструктором? В QstField есть «имя поля» — name (), я мог бы извлечь его и положить в строку:
+
+QstCondition(QstField field1, CompareFunctor functor, QstField field2)
+: _fieldName1(field1.name()), // извлекаю и кладу в строку.
+_fieldName2(field2.name()),
+_value1(QVariant()),
+_value2(QVariant()),
+_functor(functor)
+{}
+
+Прогнозирую: мне придется брать вот эти самые текстовые _fieldName1, _fieldName2 и передавать их по многу раз в QstField для генерации SQL. Не лучше ли сразу хранить имена полей в готовом классе QstField? И логичнее, и семантически правильнее. Как там по затратам на создание/хранение/копирование объектов класса QstField — уж не знаю, это меня волнует в последнюю очередь. Особенно на этапе проектирования.
+
+Потом я вспомнил, что один из конструкторов QstField выглядит так:
+
+QstField(const QString &name,
+ const FieldVisibility &visibility = FieldVisible,
+ const char *columnTitle = "",
+ const int &columnWidth = 0,
+ const Qt::Orientation &titleOrientation = Qt::Horizontal);
+
+Храню я данные все равно в QstField, значит, конструктор (1) можно исключить. Вместо него будет вызываться конструктор (5), даже если мы передаем просто две строки в качестве имен полей. Оставь я конструктор (1), и компилятор бы меня обругал: эй, прогер, у тебя конструкторы ambiguous! Чтобы в этом убедиться, я от теории перешел к практике: написал класс QstCondition, поместил в него всё, что выше и сделал несколько тестиков. Так и есть, компилятор выдает ошибку, вот только не там, где я ожидал:
+
+main.cpp:67: error: call of overloaded 'QstCondition(const char [3], Qst::CompareFunctor, const char [3])' is ambiguous
+note: candidates are: Qst::QstCondition::QstCondition(QVariant, Qst::CompareFunctor, QVariant)
+note: Qst::QstCondition::QstCondition(QString, Qst::CompareFunctor, QVariant)
+note: Qst::QstCondition::QstCondition(QString, Qst::CompareFunctor, QString)
+
+Вот так-то. Конфликтуют конструкторы (1), (2) и (3). После непродолжительных раздумий я переписал класс, поменяв заодно порядок параметров. Сейчас конструкторы выглядят так:
+
+ QstCondition(QString stringCondition);
+QstCondition(QstField field1, QstField field2, CompareFunctor functor);
+QstCondition(QString fieldName1, QString fieldName2, CompareFunctor functor);
+QstCondition(QstValue value1, QstValue value2, CompareFunctor functor);
+QstCondition(QstField field, QVariant value, CompareFunctor functor);
+QstCondition(QstField field, QstValue value);
+QstCondition(QString fieldName, QstValue value, CompareFunctor functor);
+
+Вот, с простейшими случаями разобрался. Пора переходить к монстрам. Вспоминаю про приоритет булевых операций в конструкциях «A AND B OR C» и понимаю, что с приоритетом возиться не хочу. Значит, надо как-то запретить создавать такие SQL-запросы. Скобки? Да. А где скобки, там вложенные условия: «A AND (B OR C)». Записал на языке SQL целевое условие:
+
+F1 = F2 AND (F3 < 5 OR F3 IS NULL)
+
+Были бы полезны некие гипотетические классы QstAnd и QstOr.
+
+QstAnd(QstCondition("F1 = F2"),
+       QstOr("F3 < 5", QstCondition("F3 IS NULL"))
+       )
+
+Конструкция монструозная, но пока, на стадии предварительного дизайна, ничего не поделаешь. Хотя, можно было бы сделать примерно так:
+QstCondition("F1 = F2").and(
+    QstCondition("F3", FunctorLess, 5).or("F3 IS NULL").or(...).or(...)
+    ).and(...).and(...)
+
+Возьмем на заметку это «нанизывание», а пока прошу обратить внимание: AND и OR равноправны, за исключением приоритета, конечно. То есть, оба следующих варианта должны работать:
+
+QstAnd(QstCondition("F1 = F2"),
+       QstOr("F3 < 5", QstCondition("F3 IS NULL"))
+       )
+ 
+QstOr(QstCondition("F1 = F2"),
+       QstAnd("F3 < 5", QstCondition("F3 IS NULL"))
+       )
+
+И вот задача: как сделать эти два класса QstAnd и QstOr? Оба «знают» друг друга. Теоретически, когда такое встречается в С++, можно попробовать предопределение.
+
+class B;
+ 
+class A
+{
+  // используется класс B
+};
+ 
+class B
+{
+  // используется класс A
+};
+
+Этот вариант я отбросил сразу, даже не уяснив, получилось бы что или нет. Классы QstAnd и QstOr равноправны, а если подумать, они — одно и то же, только первый выдает «AND», а второй «OR». Они должны знать друг о друге как можно меньше, не должны зависеть друг от друга. В иной ситуации, где было бы не два варианта (и/или), а три, пять, десять и более равноправных классов, предопределение не подошло бы. Мне не нравится сам вид предопределения, что-то здесь нарушается: не то логическая стройность, не то принцип сокрытия информации. Я стал думать дальше и пришел к выводу, что с помощью наследования QstAnd и QstOr сделать было бы элементарно. Задаем абстрактный класс-предок QstBool, прописываем у него виртуальный метод и наследуемся два раза:
+
+class QstBool
+{
+public:
+QstBool();
+virtual ~QstBool() = 0;
+virtual QString operatorName() const;
+};
+ 
+class QstAnd : public QstBool
+{
+public:
+QstAnd();
+virtual QString operatorName() const { return "AND"; };
+};
+ 
+class QstOr : public QstBool
+{
+public:
+QstOr();
+virtual QString operatorName() const { return "OR"; };
+};
+
+Все работало бы замечательно, вызывались какие надо конструкторы, но… Посмотрим еще раз на то, что хотим получить:
+
+QstAnd(QstCondition("F1 = F2"),
+       QstOr("F3 < 5", QstCondition("F3 IS NULL"))
+       )
+
+Напишем конструктор:
+
+QstAnd(QstCondition condition1, QstOr orCondition2);
+
+QstAnd должен получать в конструкторе объект QstOr, про который ему ничего не известно. Я мог бы сделать такой стандартный для ООП финт:
+
+QstBool(QstCondition condition1, QstBool * boolCondition2);
+
+и передавать уже не объекты классов QstAnd и QstOr, а указатели на эти объекты. Все бы работало, да вот незадача: нам бы пришлось либо передавать указатель на ранее описанный объект, либо создавать этот объект с помощью оператора new и следить потом, что он удален.
+
+1).
+QstOr myOr1(QstCondition("F3 < 5"), QstCondition("F3 IS NULL"));
+ 
+QstAnd(QstCondition("F1 = F2"),
+      &myOr1);
+ 
+2).
+QstAnd(QstCondition("F1 = F2"),
+      new QstOr(QstCondition("F3 < 5"), QstCondition("F3 IS NULL"))
+      );
+
+Ни то, ни другое не соответствует тому, что я хотел получить. Наследование заставляет беспокоиться о лишних вещах, утяжеляет и без того немаленький код.
+
+Есть ли выход?.. На уме крутились шаблоны. Где-то я уже встречался с подобной задачей. Я стал обдумывать классы QstOr, QstAnd и QstBool, как если бы они были шаблонными. При этом ни QstAnd, ни QstOr не должны с собой притащить такую громоздкую вещь, как доопределение шаблона, то есть, варианты QstAnd<AndStrategy> и QstOr<OrStrategy> отпадали, поскольку заставляли писать много. Но сама идея стратегий, кажется, была хороша. Я написал два простых класса:
+
+class QstAndOperatorStrategy
+{
+public:
+ 
+QString operatorName() const
+{
+return "AND";
+}
+};
+ 
+class QstOrOperatorStrategy
+{
+public:
+ 
+QString operatorName() const
+{
+return "OR";
+}
+};
+
+Теперь ими надо воспользоваться. Как? Ничего придумать не получалось, этот QstBool меня нервировал, и я решил, что пока забью на него. Написал просто класс, использующий шаблон «Стратегия».
+
+template <class T> class BoolTemplate
+{
+public:
+ 
+QString operatorName() const
+{
+T t;
+return t.operatorName();
+};
+};
+
+Ну, допустим. Как теперь из этого вывести QstAnd и QstOr? Сначала попробовал так:
+
+typedef BoolTemplate<QstAndOperatorStrategy> QstAnd;
+typedef BoolTemplate<QstOrOperatorStrategy> QstOr;
+
+Все бы хорошо, да вот опять не получается запихнуть в каждый из этих классов неявное знание о другом. Чего-то не хватает. Я снова зашел в тупик. Решил вернуться к QstBool, поэкспериментировал. Пусть то, что я написал, и не компилируется, зато оно отражает, что я хочу:
+
+template <class Operator> class QstBool
+{
+public:
+QstBool() {}; // Конструктор по умолчанию
+ 
+QstBool(const QstCondition &cond, const QstAnd &op) {};
+QstBool(const QstCondition &cond, const QstOr &op) {};
+ 
+QstBool(const QstCondition &cond1, const QstCondition &cond2) {};
+};
+ 
+typedef BoolTemplate<QstAndOperatorStrategy> QstAndTemplate;
+typedef BoolTemplate<QstOrOperatorStrategy> QstOrTemplate;
+ 
+typedef QstBool<QstAndTemplate> QstAnd;
+typedef QstBool<QstOrTemplate> QstOr;
+
+И опять же, как передавать в класс QstBool то, о чем он совсем, ну совсем ничего не знает? И не надо передавать! Пусть он получает в каждом из конструкторов самого себя, — а ведь QstAnd и QstOr — это и есть QstBool, только доопределенный. Главное, что я должен был понять: все три класса — это одно и то же. QstAnd и QstOr — две стороны одной монеты, а QstBool — это сама монета. Интересно, что получится, если передать в QstBool обе стратегии? Добавляю вторую стратегию, переписываю typedef'ы:
+
+template <class Operator1, class Operator2> class QstBool
+{
+public:
+QstBool() {};
+ 
+QstBool(const QstCondition &cond, const QstAnd &op) {};
+QstBool(const QstCondition &cond, const QstOr &op) {};
+ 
+QstBool(const QstCondition &cond1, const QstCondition &cond2) {};
+};
+ 
+typedef QstBool<QstAndTemplate, QstOrTemplate> QstAnd;  // Ставлю вторую стратегию, отличающуюся от первой.
+typedef QstBool<QstOrTemplate, QstAndTemplate> QstOr;
+
+Так… Я чувствую, что загадка почти пала. Заменяю QstAnd и QstOr тем, что у меня в typedef'е и получаю красоту:
+
+template <class Operator1, class Operator2> class QstBool
+{
+public:
+QstBool() {};
+ 
+QstBool(const QstCondition &cond, const QstBool<QstAndTemplate, QstOrTemplate> &op) {};
+QstBool(const QstCondition &cond, const QstBool<QstOrTemplate, QstAndTemplate> &op) {};
+ 
+QstBool(const QstCondition &cond1, const QstCondition &cond2) {};
+};
+
+И опять: QstBool ничего не знает о классах QstAndTemplate, QstOrTemplate, но ведь именно их я передаю в качестве стратегий! Заменяю QstAndTemplate на Operator1, QstOrTemplate на Operator2. В итоге код выглядит так:
+
+template <class Operator1, class Operator2>
+class QstBool
+{
+public:
+QstBool() {};
+ 
+QstBool(const QstCondition &cond, const QstBool<Operator1, Operator2> &op) {};
+QstBool(const QstCondition &cond, const QstBool<Operator2, Operator1> &op) {};
+ 
+QstBool(const QstCondition &cond1, const QstCondition &cond2) {}; 
+};
+
+Быстро пишу примерчики:
+
+QstAnd andCond(QstCondition("F1 = F2"),
+   QstOr(QstCondition("F3 = F4"), QstCondition("F3 IS NULL")));
+ 
+QstOr orCond(QstCondition("F1 = F2"),
+   QstAnd(QstCondition("F3 = F4"), QstCondition("F3 IS NULL")));
+
+Оба работают! Осталось совсем немного. Хочу, чтобы объекты возвращали строку своего оператора. Добавляю в QstBool функцию:
+
+QString operatorName() const
+{
+Operator1 t;
+return t.operatorName();
+};
+
+Фокус в том, что для QstAnd в качестве Operator1 приходит QstAndTemplate, а для QstOr — QstOrTemplate, и каждый раз функция выдает именно то, что нужно. Убедиться просто, выводим результат:
+
+QstAnd andCond2;
+QstOr orCond2;
+ 
+qDebug() << andCond2.operatorName(); // Выводит AND
+qDebug() << orCond2.operatorName(); // Выводит OR
+
+Замечательно! Так, не расслабляться. Приведу весь код, который получился:
+
+ class QstAndOperatorStrategy
+{
+public:
+ 
+QString operatorName() const
+{
+return "AND";
+}
+};
+ 
+class QstOrOperatorStrategy
+{
+public:
+ 
+QString operatorName() const
+{
+return "OR";
+}
+};
+ 
+template <class T> class BoolTemplate
+{
+public:
+ 
+QString operatorName() const
+{
+T t;
+return t.operatorName();
+};
+};
+ 
+template <class Operator1, class Operator2>
+class QstBool
+{
+public:
+ 
+QstBool() {};
+ 
+QstBool(const QstCondition &cond, const QstBool<Operator1, Operator2> &op) {};
+QstBool(const QstCondition &cond, const QstBool<Operator2, Operator1> &op) {};
+ 
+QstBool(const QstCondition &cond1, const QstCondition &cond2) {}; 
+ 
+QString operatorName() const
+{
+Operator1 t;
+return t.operatorName();
+};
+};
+ 
+typedef BoolTemplate<QstAndOperatorStrategy> QstAndTemplate;
+typedef BoolTemplate<QstOrOperatorStrategy> QstOrTemplate;
+ 
+typedef QstBool<QstAndTemplate, QstOrTemplate> QstAnd;  // Ставлю вторую стратегию, отличающуюся от первой.
+typedef QstBool<QstOrTemplate, QstAndTemplate> QstOr;
+
+Приглядимся: классы BoolTemplate, QstAndTemplate и QstOrTemplate — лишние. Убираю эту ненужную прослойку. Теперь подумаем насчет двух конструкторов:
+
+ QstBool(const QstCondition &cond, const QstBool<Operator1, Operator2> &op) {};
+QstBool(const QstCondition &cond, const QstBool<Operator2, Operator1> &op) {};
+
+Из-за первого возможны конструкции вида QstAnd(QstCondition, QstAnd) и QstOr(QstCondition, QstOr). Они, в принципе, не сильно мешают, если нужно построить такой SQL-код: F1 AND (F2 AND F3), только особого смысла я в этом не вижу. Убираю первый конструктор — запрещаю внутри класса QstAnd использовать его же. То же самое для QstOr.
+
+ template <class Operator1, class Operator2>
+class QstBool
+{
+public:
+QstBool() {};
+ 
+QstBool(const QstCondition &cond, const QstBool<Operator2, Operator1> &op) {};
+ 
+QstBool(const QstCondition &cond1, const QstCondition &cond2) {};
+QstBool(const QString &stringCond1,
+const QString &stringCond2) {};
+ 
+QString operatorName() const
+{
+Operator1 op1;
+return op1.operatorName();
+};
+};
+ 
+typedef QstBool<QstAndOperatorStrategy, QstOrOperatorStrategy> QstAnd;
+typedef QstBool<QstOrOperatorStrategy, QstAndOperatorStrategy> QstOr;
+
+Итак, главная задача решена, — и решена красиво. На последок приведу еще один выкрутас. Вспомним, что чуть ранее я рассуждал, что можно было бы организовать «нанизывание»:
+
+QstCondition("F1 = F2").and(
+    QstCondition("F3", FunctorLess, 5).or("F3 IS NULL").or(...).or(...)
+    ).and(...).and(...)
+Для классов QstAnd и QstOr эти функции были бы полезны. Только я должен помнить, что если нанизываются AND'ы, OR уже недопустим и наоборот. Как такое сделать? Элементарно. Добавляем в классы-стратегии по одной функции, отвечающей за свою операцию. Пришлось функции написать большими буквами, потому что на функцию «and()» компилятор ругается.
+
+ class QstAndOperatorStrategy
+{
+public:
+ 
+QstAndOperatorStrategy AND(const QstCondition &condition)
+{
+// Код
+return *this;
+};
+ 
+QString operatorName() const { return "AND"; }
+};
+ 
+class QstOrOperatorStrategy
+{
+public:
+ 
+QstOrOperatorStrategy OR(const QstCondition &condition)
+{
+// Код
+return *this;
+};
+ 
+QString
